@@ -1,0 +1,149 @@
+[
+  {
+    "question": "List the English names of all Pokémon types.",
+    "reference": "SELECT name FROM type_names WHERE local_language_id = 9"
+  },
+  {
+    "question": "How many Pokémon species are in generation 1?",
+    "reference": "SELECT COUNT(*) FROM pokemon_species WHERE generation_id = 1"
+  },
+  {
+    "question": "How many moves have a power above 100?",
+    "reference": "SELECT COUNT(*) FROM moves WHERE power > 100"
+  },
+  {
+    "question": "What is the genus of Bulbasaur?",
+    "reference": "SELECT genus FROM pokemon_species_names WHERE local_language_id = 9 AND name = 'Bulbasaur'"
+  },
+  {
+    "question": "What abilities can Pikachu have? Give their English names.",
+    "reference": "SELECT an.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id = p.species_id AND sn.local_language_id = 9 JOIN pokemon_abilities pa ON pa.pokemon_id = p.id JOIN ability_names an ON an.ability_id = pa.ability_id AND an.local_language_id = 9 WHERE sn.name = 'Pikachu' AND p.is_default = 1"
+  },
+  {
+    "question": "How many Fire-type Pokémon are there, counting only default forms?",
+    "reference": "SELECT COUNT(*) FROM pokemon p JOIN pokemon_types pt ON pt.pokemon_id = p.id JOIN types t ON t.id = pt.type_id WHERE t.identifier = 'fire' AND p.is_default = 1"
+  },
+  {
+    "question": "Which Fire-type Pokémon has the highest base attack? Give its English name, counting only default forms.",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_types pt ON pt.pokemon_id = p.id JOIN types t ON t.id = pt.type_id AND t.identifier = 'fire' JOIN pokemon_stats ps ON ps.pokemon_id = p.id JOIN stats s ON s.id = ps.stat_id AND s.identifier = 'attack' JOIN pokemon_species_names sn ON sn.pokemon_species_id = p.species_id AND sn.local_language_id = 9 WHERE p.is_default = 1 AND ps.base_stat = (SELECT MAX(ps2.base_stat) FROM pokemon p2 JOIN pokemon_types pt2 ON pt2.pokemon_id = p2.id JOIN types t2 ON t2.id = pt2.type_id AND t2.identifier = 'fire' JOIN pokemon_stats ps2 ON ps2.pokemon_id = p2.id JOIN stats s2 ON s2.id = ps2.stat_id AND s2.identifier = 'attack' WHERE p2.is_default = 1)"
+  },
+  {
+    "question": "What is the average base speed of Water-type Pokémon, counting only default forms?",
+    "reference": "SELECT AVG(ps.base_stat) FROM pokemon p JOIN pokemon_types pt ON pt.pokemon_id = p.id JOIN types t ON t.id = pt.type_id AND t.identifier = 'water' JOIN pokemon_stats ps ON ps.pokemon_id = p.id JOIN stats s ON s.id = ps.stat_id AND s.identifier = 'speed' WHERE p.is_default = 1"
+  },
+  {
+    "question": "Which Pokémon are both Fire and Flying type? Give English names, default forms only.",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id = p.species_id AND sn.local_language_id = 9 WHERE p.is_default = 1 AND p.id IN (SELECT pt.pokemon_id FROM pokemon_types pt JOIN types t ON t.id = pt.type_id WHERE t.identifier = 'fire') AND p.id IN (SELECT pt.pokemon_id FROM pokemon_types pt JOIN types t ON t.id = pt.type_id WHERE t.identifier = 'flying')"
+  },
+  {
+    "question": "How many different moves can Pikachu learn?",
+    "reference": "SELECT COUNT(DISTINCT pm.move_id) FROM pokemon_moves pm JOIN pokemon p ON p.id = pm.pokemon_id JOIN pokemon_species_names sn ON sn.pokemon_species_id = p.species_id AND sn.local_language_id = 9 WHERE sn.name = 'Pikachu' AND p.is_default = 1"
+  },
+  {
+    "question": "What are the five Electric-type moves with the highest power? Give their English names, breaking ties alphabetically.",
+    "reference": "SELECT mn.name FROM moves m JOIN types t ON t.id = m.type_id AND t.identifier = 'electric' JOIN move_names mn ON mn.move_id = m.id AND mn.local_language_id = 9 WHERE m.power IS NOT NULL ORDER BY m.power DESC, mn.name LIMIT 5"
+  },
+  {
+    "question": "Which default-form Pokémon has the highest total of all its base stats? Give its English name.",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_stats ps ON ps.pokemon_id = p.id JOIN pokemon_species_names sn ON sn.pokemon_species_id = p.species_id AND sn.local_language_id = 9 WHERE p.is_default = 1 GROUP BY p.id ORDER BY SUM(ps.base_stat) DESC LIMIT 1"
+  },
+  {
+    "question": "What were our sales last quarter?",
+    "unanswerable": true
+  },
+  {
+    "question": "How many abilities are there?",
+    "reference": "SELECT COUNT(*) FROM abilities",
+    "holdout": true
+  },
+  {
+    "question": "What is the English name of the Pokémon with the greatest weight among default forms?",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 WHERE p.is_default=1 ORDER BY p.weight DESC LIMIT 1",
+    "holdout": true
+  },
+  {
+    "question": "Which type has the most moves? Give its English name.",
+    "reference": "SELECT tn.name FROM moves m JOIN type_names tn ON tn.type_id=m.type_id AND tn.local_language_id=9 GROUP BY m.type_id ORDER BY COUNT(*) DESC LIMIT 1",
+    "holdout": true
+  },
+  {
+    "question": "What is Charizard's base speed?",
+    "reference": "SELECT ps.base_stat FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_stats ps ON ps.pokemon_id=p.id JOIN stats s ON s.id=ps.stat_id AND s.identifier='speed' WHERE sn.name='Charizard' AND p.is_default=1",
+    "holdout": true
+  },
+  {
+    "question": "How many Pokémon species evolve from another species?",
+    "reference": "SELECT COUNT(*) FROM pokemon_species WHERE evolves_from_species_id IS NOT NULL",
+    "holdout": true
+  },
+  {
+    "question": "Which Pokémon species evolve from Eevee? Give English names.",
+    "reference": "SELECT sn.name FROM pokemon_species s JOIN pokemon_species_names sn ON sn.pokemon_species_id=s.id AND sn.local_language_id=9 JOIN pokemon_species_names parent ON parent.pokemon_species_id=s.evolves_from_species_id AND parent.local_language_id=9 WHERE parent.name='Eevee'",
+    "holdout": true
+  },
+  {
+    "question": "How many baby Pokémon species are there?",
+    "reference": "SELECT COUNT(*) FROM pokemon_species WHERE is_baby=1",
+    "holdout": true
+  },
+  {
+    "question": "What is the English name of the move with the highest accuracy-free power, meaning the single highest power of any move?",
+    "reference": "SELECT mn.name FROM moves m JOIN move_names mn ON mn.move_id=m.id AND mn.local_language_id=9 WHERE m.power=(SELECT MAX(power) FROM moves)",
+    "holdout": true
+  },
+  {
+    "question": "Which pokemon has the highest defense?",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_stats ps ON ps.pokemon_id=p.id JOIN stats s ON s.id=ps.stat_id AND s.identifier='defense' WHERE p.is_default=1 ORDER BY ps.base_stat DESC LIMIT 1",
+    "plain": true
+  },
+  {
+    "question": "Who has the best defense stat?",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_stats ps ON ps.pokemon_id=p.id JOIN stats s ON s.id=ps.stat_id AND s.identifier='defense' WHERE p.is_default=1 ORDER BY ps.base_stat DESC LIMIT 1",
+    "plain": true
+  },
+  {
+    "question": "Which pokemon is the fastest?",
+    "reference": "SELECT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_stats ps ON ps.pokemon_id=p.id JOIN stats s ON s.id=ps.stat_id AND s.identifier='speed' WHERE p.is_default=1 ORDER BY ps.base_stat DESC LIMIT 1",
+    "plain": true
+  },
+  {
+    "question": "List all the fire type pokemon",
+    "reference": "SELECT DISTINCT sn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_types pt ON pt.pokemon_id=p.id JOIN types t ON t.id=pt.type_id AND t.identifier='fire' WHERE p.is_default=1",
+    "plain": true
+  },
+  {
+    "question": "What is the strongest move?",
+    "reference": "SELECT mn.name FROM moves m JOIN move_names mn ON mn.move_id=m.id AND mn.local_language_id=9 WHERE m.power=(SELECT MAX(power) FROM moves)",
+    "plain": true
+  },
+  {
+    "question": "What abilities does Charizard have?",
+    "reference": "SELECT an.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_abilities pa ON pa.pokemon_id=p.id JOIN ability_names an ON an.ability_id=pa.ability_id AND an.local_language_id=9 WHERE sn.name='Charizard' AND p.is_default=1",
+    "plain": true
+  },
+  {
+    "question": "What moves can Pikachu learn?",
+    "reference": "SELECT DISTINCT mn.name FROM pokemon p JOIN pokemon_species_names sn ON sn.pokemon_species_id=p.species_id AND sn.local_language_id=9 JOIN pokemon_moves pm ON pm.pokemon_id=p.id JOIN move_names mn ON mn.move_id=pm.move_id AND mn.local_language_id=9 WHERE sn.name='Pikachu' AND p.is_default=1",
+    "plain": true
+  },
+  {
+    "question": "What is the Japanese name of Pikachu?",
+    "reference": "SELECT j.name FROM pokemon_species_names e JOIN pokemon_species_names j ON j.pokemon_species_id=e.pokemon_species_id AND j.local_language_id=1 WHERE e.local_language_id=9 AND e.name='Pikachu'",
+    "plain": true
+  },
+  {
+    "question": "what level does sqirtle evolve",
+    "reference": "SELECT e.minimum_level FROM pokemon_evolution e JOIN pokemon_species s ON s.id=e.evolved_species_id JOIN pokemon_species_names n ON n.pokemon_species_id=s.evolves_from_species_id AND n.local_language_id=9 WHERE n.name='Squirtle'",
+    "plain": true
+  },
+  {
+    "question": "At what level does Charmander evolve?",
+    "reference": "SELECT e.minimum_level FROM pokemon_evolution e JOIN pokemon_species s ON s.id=e.evolved_species_id JOIN pokemon_species_names n ON n.pokemon_species_id=s.evolves_from_species_id AND n.local_language_id=9 WHERE n.name='Charmander'",
+    "plain": true
+  },
+  {
+    "question": "what level does bulbsaur evolve",
+    "reference": "SELECT e.minimum_level FROM pokemon_evolution e JOIN pokemon_species s ON s.id=e.evolved_species_id JOIN pokemon_species_names n ON n.pokemon_species_id=s.evolves_from_species_id AND n.local_language_id=9 WHERE n.name='Bulbasaur'",
+    "plain": true
+  }
+]

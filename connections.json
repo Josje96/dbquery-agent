@@ -1,0 +1,16 @@
+[
+  {
+    "id": "sqldex",
+    "name": "SQL-Dex (Pokémon)",
+    "type": "sqlite",
+    "path": "data/pokedex.sqlite",
+    "notesFile": "notes/sqldex.md",
+    "sampleColumns": "*",
+    "requiredFilters": [
+      {
+        "column": "local_language_id",
+        "hint": "Use 9 for English unless the question asks for another language."
+      }
+    ]
+  }
+]

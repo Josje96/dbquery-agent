@@ -1,0 +1,10 @@
+- Display names are in translation tables ending in `_names`. Filter them with `local_language_id = 9` for English.
+- `local_language_id` values: 1 Japanese, 2 romanized Japanese, 3 Korean, 4 Chinese, 5 French, 6 German, 9 English. Use English unless the question asks for another language.
+- `pokemon` has no name column. Join `pokemon.species_id` to `pokemon_species_names.pokemon_species_id` for a Pokémon's name.
+- `identifier` columns hold lowercase slugs such as `fire`. Prefer them for filtering, and the `_names` tables for display.
+- `pokemon` includes alternate forms. Filter on `pokemon.is_default = 1` to count each species once.
+- A Pokémon's type is in `pokemon_types`, joined to `types`. A type can be Fire, Water, Flying or Electric, and a Pokémon can have two.
+- Base stats such as hp, attack, defense and speed are in `pokemon_stats.base_stat`, joined to `stats` by `stat_id`. Don't use Pokéathlon tables for these.
+- A move's type and power are in `moves`, with its display name in `move_names`.
+- A Pokémon's abilities are in `pokemon_abilities`, joined to `ability_names`. The moves it can learn are in `pokemon_moves`, joined to `move_names`, and repeat across games, so use DISTINCT.
+- To find how a Pokémon evolves, `pokemon_evolution.evolved_species_id` is the species after evolving, so look up the species whose `pokemon_species.evolves_from_species_id` is the Pokémon asked about, then join `pokemon_evolution` on that species. `minimum_level` is the level. `party_species_id` is an unrelated, rare requirement for another Pokémon in the party.- Tables starting with `conquest_` belong to the spin-off game Pokémon Conquest. Don't use them unless the question mentions Conquest.
