@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "jsx": "preserve"
   },
-  "include": ["server", "web", "vite.config.ts"]
+  "include": ["server", "web", "scripts", "evals", "vite.config.ts"]
 }

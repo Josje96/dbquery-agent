@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DB Query Agent Performance</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f7f7f5; --surface: #ffffff; --text: #1d1f23; --muted: #5d636e; --border: #dfe1e4;
+  --accent: #1f55c4; --accent-soft: #e8effc; --good: #17693a; --warn: #8a5300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14161a; --surface: #1c1f25; --text: #eceef1; --muted: #a2a8b3; --border: #30343c;
+    --accent: #8fb0ff; --accent-soft: #1f2a42; --good: #6fd79b; --warn: #f0b860;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 40px 24px 72px; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+h2 { font-size: 1.3rem; margin: 48px 0 12px; letter-spacing: -0.005em; }
+h3 { font-size: 1rem; margin: 20px 0 6px; }
+p { margin: 0 0 12px; max-width: 72ch; }
+ul, ol { margin: 0 0 12px; padding-left: 22px; max-width: 72ch; }
+li { margin-bottom: 6px; }
+code { font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.callout { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 24px 0; }
+.callout p:last-child { margin-bottom: 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 24px 0; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.stat b { display: block; font-size: 1.45rem; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 0.875rem; }
+.wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+caption { text-align: left; padding: 12px 14px 0; color: var(--muted); font-size: 0.85rem; }
+th, td { padding: 9px 14px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+thead th { font-size: 0.78rem; color: var(--muted); font-weight: 600; white-space: nowrap; vertical-align: bottom; }
+tbody tr:last-child > * { border-bottom: 0; }
+tbody th { font-weight: 600; min-width: 150px; }
+tbody th code { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; margin-top: 2px; white-space: nowrap; }
+.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+thead .n { text-align: right; }
+.strong { font-weight: 650; }
+.top { background: var(--accent-soft); }
+.yes { color: var(--good); font-weight: 600; }
+.no { color: var(--warn); font-weight: 600; }
+.sub { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.note { color: var(--muted); font-size: 0.875rem; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
+@media (max-width: 600px) { main { padding: 28px 16px 56px; } h1 { font-size: 1.6rem; } }
+</style>
+</head>
+<body>
+<main>
+<h1>DB Query Agent: model performance</h1>
+<p class="lede">Which model should write the SQL, how reliable is it, and what does it cost? Measured November 5, 2026, through OpenRouter.</p>
+
+<div class="callout">
+<p><strong>Recommendation: use DeepSeek V4.1 Flash as the default.</strong> It was the only model with a perfect score, 96 of 96, at $0.032 for all three runs. Claude Sonnet 5.5 cost about 24 times as much and scored 91. Local models stay out of scope for now.</p>
+</div>
+
+<div class="stats">
+<div class="stat"><b>10</b><span>models tested, 3 runs each</span></div>
+<div class="stat"><b>32</b><span>questions per run, 960 scored in total</span></div>
+<div class="stat"><b>$1.21</b><span>total measured cost of this comparison</span></div>
+<div class="stat"><b>$0.34</b><span>per 1,000 questions on DeepSeek V4.1 Flash</span></div>
+</div>
+
+<h2>The project</h2>
+<p>DB Query Agent helps you understand your data by asking questions in plain English. It's for anyone with a database and questions about it, including founders, startups, homelabbers and teams at work. It writes the SQL, shows it for review, and runs it only when you click Run. It's an early prototype, tested so far on SQL-Dex, a 170-table Pokémon SQLite database, with Microsoft SQL Server support planned.</p>
+<h3>How a question is answered</h3>
+<ol>
+<li><strong>Profile, with no AI.</strong> Setup scripts record tables, keys, row counts and sample values in a local search index.</li>
+<li><strong>Find tables, with no AI.</strong> The question is searched against that index, tolerating typos, and foreign keys connect the matches. The model typically sees 3–4k characters of schema rather than about 50k.</li>
+<li><strong>Generate.</strong> The model writes one <code>SELECT</code>, using that schema and hand-written notes about the database.</li>
+<li><strong>Check.</strong> Code refuses anything but a single read query, compiles it, and sends it back with the error if it fails. It also enforces required filters, such as language.</li>
+<li><strong>Run on request.</strong> The connection is read-only, with a 1,000-row cap and a 10-second limit.</li>
+</ol>
+<p><strong>Stack:</strong> Vue and Vite, Hono on Bun, SQLite for testing, and any OpenAI-compatible model API. Login, saved queries, sharing and the SQL Server adapter aren't built yet.</p>
+
+<h2>Accuracy</h2>
+<p>Ranked by total score, then by cost. A question passes when the query returns the known correct rows. Row order and extra columns don't count against it.</p>
+<div class="wrap"><table>
+<thead><tr><th scope="col">Model</th><th scope="col" class="n">Score</th><th scope="col" class="n">Each run (of 32)</th><th scope="col" class="n">Wrong result</th><th scope="col" class="n">Refused</th><th scope="col" class="n">Empty reply</th><th scope="col" class="n">Retries</th><th scope="col" class="n">Time per run</th></tr></thead>
+<tbody>
+<tr class="top"><th scope="row">DeepSeek V4.1 Flash</th>
+    <td class="n strong">96/96</td><td class="n">32, 32, 32</td>
+    <td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td>
+    <td class="n">44–51s</td></tr>
+<tr><th scope="row">Claude Haiku 5.5</th>
+    <td class="n strong">93/96</td><td class="n">31, 31, 31</td>
+    <td class="n">0</td><td class="n">3</td><td class="n">0</td><td class="n">0</td>
+    <td class="n">82–87s</td></tr>
+<tr><th scope="row">GPT-6 Luna</th>
+    <td class="n strong">92/96</td><td class="n">31, 31, 30</td>
+    <td class="n">1</td><td class="n">3</td><td class="n">0</td><td class="n">0</td>
+    <td class="n">91–95s</td></tr>
+<tr><th scope="row">Qwen3-Coder-Next</th>
+    <td class="n strong">92/96</td><td class="n">31, 30, 31</td>
+    <td class="n">4</td><td class="n">0</td><td class="n">0</td><td class="n">3</td>
+    <td class="n">62–68s</td></tr>
+<tr><th scope="row">GLM 5.3 Flash</th>
+    <td class="n strong">92/96</td><td class="n">32, 29, 31</td>
+    <td class="n">3</td><td class="n">0</td><td class="n">1</td><td class="n">5</td>
+    <td class="n">117–126s</td></tr>
+<tr><th scope="row">GLM 5.3</th>
+    <td class="n strong">92/96</td><td class="n">32, 28, 32</td>
+    <td class="n">3</td><td class="n">1</td><td class="n">0</td><td class="n">4</td>
+    <td class="n">54–86s</td></tr>
+<tr><th scope="row">GPT-OSS 120B</th>
+    <td class="n strong">91/96</td><td class="n">30, 31, 30</td>
+    <td class="n">2</td><td class="n">3</td><td class="n">0</td><td class="n">0</td>
+    <td class="n">69–89s</td></tr>
+<tr><th scope="row">Claude Sonnet 5.5</th>
+    <td class="n strong">91/96</td><td class="n">30, 31, 30</td>
+    <td class="n">1</td><td class="n">4</td><td class="n">0</td><td class="n">0</td>
+    <td class="n">67s</td></tr>
+<tr><th scope="row">Gemma 4 26B</th>
+    <td class="n strong">84/96</td><td class="n">28, 27, 29</td>
+    <td class="n">11</td><td class="n">1</td><td class="n">0</td><td class="n">10</td>
+    <td class="n">57–68s</td></tr>
+<tr><th scope="row">Qwen3.6 35B</th>
+    <td class="n strong">67/96</td><td class="n">24, 22, 21</td>
+    <td class="n">0</td><td class="n">0</td><td class="n">29</td><td class="n">6</td>
+    <td class="n">237–274s</td></tr>
+</tbody></table></div>
+<p class="note">Times are rough, because six runs shared the connection at once and were routed to different providers.</p>
+<h3>How to read the failures</h3>
+<ul>
+<li><strong>A wrong result is the dangerous kind.</strong> The SQL looks plausible, so a non-SQL user won't catch it. Gemma 4 26B had the most, at 11.</li>
+<li><strong>A refusal is often the table finder's fault.</strong> Several models correctly said the stats tables weren't sent to them, on the Fire-type attack and "fastest" questions. Refusing is safer than guessing, so a lower score here doesn't always mean a worse model.</li>
+<li><strong>Empty replies are wasted money.</strong> Qwen3.6 35B returned nothing 29 times and used far more output tokens, so it's slow, inaccurate and comparatively expensive here. The cause isn't confirmed. The 2,000-token reply limit is the first thing to check.</li>
+</ul>
+
+<h2>Pricing and zero data retention</h2>
+<p>All prices are US dollars per million tokens. Zero retention was required on every request, and OpenRouter routes each one to a qualifying endpoint, so the real rate depends on which provider serves it. That's why the last column is measured rather than calculated.</p>
+<div class="wrap"><table>
+<thead><tr><th scope="col">Model</th><th scope="col">Zero retention</th><th scope="col" class="n">List in</th><th scope="col" class="n">List out</th><th scope="col" class="n">ZDR range in</th><th scope="col" class="n">ZDR range out</th><th scope="col" class="n">3-run cost</th></tr></thead>
+<tbody>
+<tr><th scope="row">DeepSeek V4.1 Flash<code>deepseek/deepseek-v4.1-flash</code></th><td><span class="yes">Yes</span> <span class="sub">25 providers</span></td>
+    <td class="n">$0.045</td><td class="n">$0.50</td>
+    <td class="n">$0.006–0.45</td><td class="n">$0.336–1.80</td>
+    <td class="n strong">$0.0322</td></tr>
+<tr><th scope="row">Claude Haiku 5.5<code>anthropic/claude-haiku-5.5</code></th><td><span class="yes">Yes</span> <span class="sub">2 providers</span></td>
+    <td class="n">$0.10</td><td class="n">$0.50</td>
+    <td class="n">$0.10–0.11</td><td class="n">$0.50–0.55</td>
+    <td class="n strong">$0.0507</td></tr>
+<tr><th scope="row">GPT-6 Luna<code>openai/gpt-6-luna</code></th><td><span class="yes">Yes</span> <span class="sub">1 provider</span></td>
+    <td class="n">$0.10</td><td class="n">$0.50</td>
+    <td class="n">$0.10–0.11</td><td class="n">$0.50–0.55</td>
+    <td class="n strong">$0.0165</td></tr>
+<tr><th scope="row">Qwen3-Coder-Next<code>qwen/qwen3-coder-next</code></th><td><span class="yes">Yes</span> <span class="sub">1 provider</span></td>
+    <td class="n">$0.12</td><td class="n">$0.80</td>
+    <td class="n">$0.12</td><td class="n">$0.80</td>
+    <td class="n strong">$0.0240</td></tr>
+<tr><th scope="row">GLM 5.3 Flash<code>z-ai/glm-5.3-flash</code></th><td><span class="yes">Yes</span> <span class="sub">31 providers</span></td>
+    <td class="n">$0.15</td><td class="n">$0.50</td>
+    <td class="n">$0.029–0.225</td><td class="n">$0.092–0.75</td>
+    <td class="n strong">$0.0289</td></tr>
+<tr><th scope="row">GLM 5.3<code>z-ai/glm-5.3</code></th><td><span class="yes">Yes</span> <span class="sub">32 providers</span></td>
+    <td class="n">$0.07</td><td class="n">$1.40</td>
+    <td class="n">$0.07–2.10</td><td class="n">$1.40–6.60</td>
+    <td class="n strong">$0.1074</td></tr>
+<tr><th scope="row">GPT-OSS 120B<code>openai/gpt-oss-120b</code></th><td><span class="yes">Yes</span> <span class="sub">23 providers</span></td>
+    <td class="n">$0.15</td><td class="n">$0.60</td>
+    <td class="n">$0.03–0.35</td><td class="n">$0.15–0.95</td>
+    <td class="n strong">$0.0153</td></tr>
+<tr><th scope="row">Claude Sonnet 5.5<code>anthropic/claude-sonnet-5.5</code></th><td><span class="yes">Yes</span> <span class="sub">2 providers</span></td>
+    <td class="n">$2.00</td><td class="n">$10.00</td>
+    <td class="n">$2.00–2.20</td><td class="n">$10.00–11.00</td>
+    <td class="n strong">$0.7788</td></tr>
+<tr><th scope="row">Gemma 4 26B<code>google/gemma-4-26b-a4b-it</code></th><td><span class="yes">Yes</span> <span class="sub">14 providers</span></td>
+    <td class="n">$0.03</td><td class="n">$0.089</td>
+    <td class="n">$0.029–0.15</td><td class="n">$0.088–0.60</td>
+    <td class="n strong">$0.0180</td></tr>
+<tr><th scope="row">Qwen3.6 35B<code>qwen/qwen3.6-35b-a3b</code></th><td><span class="yes">Yes</span> <span class="sub">9 providers</span></td>
+    <td class="n">$0.10</td><td class="n">$0.90</td>
+    <td class="n">$0.025–0.24</td><td class="n">$0.225–1.80</td>
+    <td class="n strong">$0.1397</td></tr>
+<tr><th scope="row">Claude Sonnet 5.5 (batch)<code>anthropic/claude-sonnet-5.5:batch</code></th><td><span class="no">Not listed</span></td><td class="n">$1.00</td><td class="n">$5.00</td><td class="n">n/a</td><td class="n">n/a</td><td class="n">Not testable</td></tr>
+</tbody></table></div>
+<p class="note">Sonnet batch has no zero-retention endpoint listed, and OpenRouter rejects <code>:batch</code> models on the chat endpoint this app uses. It could only serve offline jobs, such as running this test, and would need separate code. Zero-retention status is taken from OpenRouter's endpoint list and hasn't been independently audited, so check each provider's terms before sending sensitive data. Prices change often.</p>
+
+<h2>Cost versus benefit</h2>
+<p>Sorted cheapest first. The 3-run cost covers 96 questions, including retries. These tokens come from a small-schema test, so treat the dollars as a comparison between models rather than a production budget.</p>
+<div class="wrap"><table>
+<thead><tr><th scope="col">Model</th><th scope="col" class="n">3-run cost</th><th scope="col" class="n">Score</th><th scope="col" class="n">Per 1,000 questions</th><th scope="col" class="n">Per 1,000 correct</th><th scope="col" class="n">Tokens in</th><th scope="col" class="n">Tokens out</th></tr></thead>
+<tbody>
+<tr><th scope="row">GPT-OSS 120B</th><td class="n strong">$0.0153</td>
+    <td class="n">91/96</td>
+    <td class="n">$0.16</td><td class="n">$0.17</td>
+    <td class="n">164,460</td><td class="n">29,037</td></tr>
+<tr><th scope="row">GPT-6 Luna</th><td class="n strong">$0.0165</td>
+    <td class="n">92/96</td>
+    <td class="n">$0.17</td><td class="n">$0.18</td>
+    <td class="n">158,343</td><td class="n">17,624</td></tr>
+<tr><th scope="row">Gemma 4 26B</th><td class="n strong">$0.0180</td>
+    <td class="n">84/96</td>
+    <td class="n">$0.19</td><td class="n">$0.21</td>
+    <td class="n">207,327</td><td class="n">13,303</td></tr>
+<tr><th scope="row">Qwen3-Coder-Next</th><td class="n strong">$0.0240</td>
+    <td class="n">92/96</td>
+    <td class="n">$0.25</td><td class="n">$0.26</td>
+    <td class="n">169,072</td><td class="n">9,742</td></tr>
+<tr><th scope="row">GLM 5.3 Flash</th><td class="n strong">$0.0289</td>
+    <td class="n">92/96</td>
+    <td class="n">$0.30</td><td class="n">$0.31</td>
+    <td class="n">167,070</td><td class="n">34,858</td></tr>
+<tr><th scope="row">DeepSeek V4.1 Flash</th><td class="n strong">$0.0322</td>
+    <td class="n">96/96</td>
+    <td class="n">$0.34</td><td class="n">$0.34</td>
+    <td class="n">169,318</td><td class="n">18,919</td></tr>
+<tr><th scope="row">Claude Haiku 5.5</th><td class="n strong">$0.0507</td>
+    <td class="n">93/96</td>
+    <td class="n">$0.53</td><td class="n">$0.54</td>
+    <td class="n">282,972</td><td class="n">44,743</td></tr>
+<tr><th scope="row">GLM 5.3</th><td class="n strong">$0.1074</td>
+    <td class="n">92/96</td>
+    <td class="n">$1.12</td><td class="n">$1.17</td>
+    <td class="n">166,498</td><td class="n">19,023</td></tr>
+<tr><th scope="row">Qwen3.6 35B</th><td class="n strong">$0.1397</td>
+    <td class="n">67/96</td>
+    <td class="n">$1.46</td><td class="n">$2.09</td>
+    <td class="n">197,808</td><td class="n">133,724</td></tr>
+<tr><th scope="row">Claude Sonnet 5.5</th><td class="n strong">$0.7788</td>
+    <td class="n">91/96</td>
+    <td class="n">$8.11</td><td class="n">$8.56</td>
+    <td class="n">282,972</td><td class="n">21,281</td></tr>
+</tbody></table></div>
+<ul>
+<li><strong>Price barely matters at this volume.</strong> Every model except Sonnet costs under $1.46 per 1,000 questions. A single wrong answer acted on costs far more, so choose on accuracy first.</li>
+<li><strong>Paying more didn't buy accuracy.</strong> Sonnet was the most expensive and tied for 7th.</li>
+<li><strong>List price can mislead.</strong> The Claude models were counted at 282,972 input tokens against 169,318 for DeepSeek on the same questions. So list prices alone can't predict the bill: Haiku cost $0.051 against DeepSeek's $0.032.</li>
+<li><strong>The cheapest isn't the best value.</strong> GPT-OSS 120B and GPT-6 Luna cost about half of DeepSeek, but they refused or missed several questions that DeepSeek answered.</li>
+</ul>
+
+<h2>Local models</h2>
+<p>The current call is that <strong>local isn't there yet, even with 128 GB of VRAM available</strong>, so this tool stays on hosted models with zero retention for now. That's a judgment rather than something this test measured: every run here used hosted endpoints, and nothing has been run on a DGX Spark. GPT-OSS 120B, the largest candidate considered for local use, scored 91 of 96 when hosted, so a later test would need to measure speed and accuracy on the actual hardware.</p>
+
+<h2>Limits of these results</h2>
+<ul>
+<li><strong>Scores vary between runs.</strong> Differences of a few points are mostly noise. Haiku scored 96 in an earlier round and 93 here, and Gemma went from 89 to 84. Only DeepSeek stayed perfect, across six runs.</li>
+<li><strong>The test may be too easy for the top models.</strong> It's 32 questions, written by the same author as the database notes, and some were used for tuning.</li>
+<li><strong>DeepSeek's perfect score may lean on the notes.</strong> It answered questions where the finder hadn't sent the stats tables, possibly by using table names from the notes. Its SQL hasn't been reviewed to confirm this.</li>
+<li><strong>It's only Pokémon data.</strong> A real SQL Server schema will be a different and probably harder test.</li>
+</ul>
+
+<h2>Next steps</h2>
+<ol>
+<li>Fix the table finder, and retry empty replies, so scores no longer depend on the notes.</li>
+<li>Add about 20 harder questions, including vague wording and questions with no valid answer.</li>
+<li>Rerun the top models, then settle the default.</li>
+<li>Build login, saved queries, sharing and verified queries, then the SQL Server adapter.</li>
+</ol>
+
+<footer>Rerun any model with <code>bun run eval sqldex &lt;model&gt;</code>. Claude models and GPT-6 Luna need <code>MODEL_TEMPERATURE=none</code>. Pricing and zero-retention data came from OpenRouter on November 5, 2026.</footer>
+</main>
+</body>
+</html>

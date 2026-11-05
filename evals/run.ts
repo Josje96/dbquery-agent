@@ -24,6 +24,15 @@ const config = (await loadConnections(env.CONNECTIONS_FILE)).find(({ id }) => id
 if (!config) throw new Error(`Unknown connection: ${connectionId}`);
 if (!env.MODEL_BASE_URL || !env.MODEL_API_KEY || !modelName) throw new Error("Set the MODEL_ values in .env");
 
+const usage = {
+  calls: 0,
+  callsWithoutCost: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cost: 0,
+  providers: {} as Record<string, number>,
+};
+
 const adapter = createAdapter(config);
 const model = createModelProvider({
   baseUrl: env.MODEL_BASE_URL,
@@ -31,6 +40,15 @@ const model = createModelProvider({
   model: modelName,
   requireZdr: env.MODEL_REQUIRE_ZDR,
   temperature: env.MODEL_TEMPERATURE,
+  onUsage(call) {
+    usage.calls++;
+    usage.inputTokens += call.inputTokens;
+    usage.outputTokens += call.outputTokens;
+    usage.cost += call.cost ?? 0;
+    if (call.cost === null) usage.callsWithoutCost++;
+    const provider = call.provider ?? "unknown";
+    usage.providers[provider] = (usage.providers[provider] ?? 0) + 1;
+  },
 });
 const notes = config.notesFile ? await Bun.file(config.notesFile).text() : "";
 const cases = (await Bun.file(`evals/${connectionId}.json`).json()) as EvalCase[];
@@ -106,4 +124,5 @@ console.log(
     `Plain: ${passed.plain}/${total("plain")}  ` +
     `${retried} needed a retry, ${Math.round((performance.now() - started) / 1000)}s total`,
 );
+console.log(`Usage: ${JSON.stringify(usage)}`);
 adapter.close();
