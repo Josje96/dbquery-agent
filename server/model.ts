@@ -14,7 +14,16 @@ export interface ModelProvider {
   generateQuery(messages: ChatMessage[]): Promise<GeneratedQuery>;
 }
 
+export interface ModelUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** In US dollars, when the API reports it. */
+  cost: number | null;
+  provider: string | null;
+}
+
 export interface ModelConfig {
+  onUsage?: (usage: ModelUsage) => void;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -73,7 +82,18 @@ export function createModelProvider(config: ModelConfig): ModelProvider {
       if (!response.ok) {
         throw new Error(`Model request failed (${response.status}): ${(await response.text()).slice(0, 300)}`);
       }
-      const body = (await response.json()) as { choices?: { message?: { content?: string | null } }[] };
+      const body = (await response.json()) as {
+        choices?: { message?: { content?: string | null } }[];
+        provider?: string;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+      };
+      // Reported before the content check, because empty replies are still billed.
+      config.onUsage?.({
+        inputTokens: body.usage?.prompt_tokens ?? 0,
+        outputTokens: body.usage?.completion_tokens ?? 0,
+        cost: body.usage?.cost ?? null,
+        provider: body.provider ?? null,
+      });
       const content = body.choices?.[0]?.message?.content;
       if (!content) throw new Error("Model returned an empty response");
       return parseGeneratedQuery(content);

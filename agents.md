@@ -1,16 +1,18 @@
 # dbquery-agent
 
-Internal web tool: users ask a database a question in plain English, a model
-writes the SQL, and queries can be saved and shared. It starts as a prototype
-for work, built so it could become a product for others.
+Helps people understand their data: users ask a database a question in plain
+English, a model writes the SQL, and queries can be saved and shared. It's for
+anyone with a database, including founders, startups, homelabbers and teams at
+work, so keep docs and defaults general rather than tied to one workplace.
 
 ## Stack
 
 - Vue SPA built with Vite (`web/`)
 - Hono API on Bun (`server/`), which also serves the built SPA
-- Test database: SQL-Dex Pokémon SQLite, a local copy at `data/pokedex.sqlite`
-  (gitignored; 170 tables)
-- Production target: Microsoft SQL Server, added as an adapter
+- Test database: Pokémon SQLite, 170 tables, at `data/pokedex.sqlite`. Get it with
+  `bun run setup:data`. Never commit it: this repo is public and MIT, and the MIT
+  license doesn't cover the data.
+- Planned next database: Microsoft SQL Server, added as an adapter
 
 ## Rules
 
@@ -54,6 +56,11 @@ for work, built so it could become a product for others.
    timeout and cancellation, and its own `validate` (`sp_describe_first_result_set`).
 
 ## Model results
+
+Current results, pricing and cost per model are in `docs/findings.html`, which replaces
+the older numbers below. Models are listed in `.env` for switching. The current call is that
+local models aren't ready even with 128 GB of VRAM, so the tool stays on hosted models with
+zero retention for now. The local path in step 4 is untested and not a priority.
 
 `bun run eval sqldex <model>`, 2026-11-05, through OpenRouter with zero retention:
 

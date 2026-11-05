@@ -6,7 +6,11 @@ const envSchema = z.object({
   CONNECTIONS_FILE: z.string().default("connections.json"),
   PROFILE_DIR: z.string().default("data/profiles"),
   MODEL_BASE_URL: z.url().optional(),
-  MODEL_API_KEY: z.string().min(1).optional(),
+  // A blank key, as in a copied .env.example, means no model is configured.
+  MODEL_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
   MODEL_NAME: z.string().min(1).optional(),
   // "none" leaves the setting out, for models that reject it.
   MODEL_TEMPERATURE: z

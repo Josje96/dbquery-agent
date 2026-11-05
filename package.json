@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "build": "vite build",
     "start": "bun server/index.ts",
+    "setup:data": "bun scripts/setup-data.ts",
     "profile": "bun server/profiler/cli.ts",
     "eval": "bun evals/run.ts",
     "test": "bun test",
